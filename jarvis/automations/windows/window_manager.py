@@ -9,7 +9,7 @@ from jarvis.core.logger import get_logger
 
 logger = get_logger("JARVIS.WindowManager")
 
-user32 = ctypes.windll.user32
+user32 = getattr(ctypes, "windll", None).user32 if hasattr(ctypes, "windll") else None
 
 # Win32 Constants
 SW_HIDE = 0
@@ -36,6 +36,8 @@ class WindowManager:
 
     def get_foreground_window(self) -> Optional[WindowInfo]:
         """Retrieve details of the current active foreground window."""
+        if not self.user32:
+            return None
         hwnd = self.user32.GetForegroundWindow()
         if not hwnd:
             return None
@@ -52,6 +54,8 @@ class WindowManager:
 
     def _get_window_title(self, hwnd: int) -> str:
         """Read window title string from HWND."""
+        if not self.user32:
+            return ""
         length = self.user32.GetWindowTextLengthW(hwnd)
         if length == 0:
             return ""
@@ -61,6 +65,8 @@ class WindowManager:
 
     def list_open_windows(self, include_empty_titles: bool = False) -> List[WindowInfo]:
         """List all top-level visible desktop application windows."""
+        if not self.user32:
+            return []
         windows: List[WindowInfo] = []
 
         WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)

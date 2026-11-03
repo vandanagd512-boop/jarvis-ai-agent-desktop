@@ -18,6 +18,8 @@ logger = get_logger("JARVIS.ScreenCapture")
 
 def _win32_gdi_screenshot() -> Optional[Image.Image]:
     """Capture desktop display directly via Win32 GDI BitBlt API."""
+    if not hasattr(ctypes, "windll"):
+        return None
     try:
         user32 = ctypes.windll.user32
         gdi32 = ctypes.windll.gdi32

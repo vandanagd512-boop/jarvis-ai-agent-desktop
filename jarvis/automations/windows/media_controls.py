@@ -6,7 +6,7 @@ from jarvis.core.logger import get_logger
 
 logger = get_logger("JARVIS.MediaControls")
 
-user32 = ctypes.windll.user32
+user32 = getattr(ctypes, "windll", None).user32 if hasattr(ctypes, "windll") else None
 
 # Virtual Key Codes
 VK_VOLUME_MUTE = 0xAD
@@ -24,6 +24,8 @@ KEYEVENTF_KEYUP = 0x0002
 
 def _press_key(vk_code: int) -> None:
     """Simulate key press and release."""
+    if not user32:
+        return
     user32.keybd_event(vk_code, 0, KEYEVENTF_EXTENDEDKEY, 0)
     time.sleep(0.05)
     user32.keybd_event(vk_code, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0)

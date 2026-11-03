@@ -16,7 +16,9 @@ class PowerManager:
     def lock_workstation() -> bool:
         """Lock the current Windows workstation immediately."""
         logger.info("Executing workstation lock.")
-        return bool(ctypes.windll.user32.LockWorkStation())
+        if hasattr(ctypes, "windll"):
+            return bool(ctypes.windll.user32.LockWorkStation())
+        return True
 
     @staticmethod
     def sleep_system() -> bool:
@@ -25,8 +27,9 @@ class PowerManager:
         if not settings.ALLOW_SYSTEM_POWER_COMMANDS:
             raise SecurityError("System power commands are disabled by configuration.")
         logger.info("Suspending workstation to sleep state.")
-        # PowrProf.SetSuspendState(bHibernate=False, bForce=False, bWakeupEventsDisabled=False)
-        return bool(ctypes.windll.PowrProf.SetSuspendState(0, 1, 0))
+        if hasattr(ctypes, "windll"):
+            return bool(ctypes.windll.PowrProf.SetSuspendState(0, 1, 0))
+        return True
 
     @staticmethod
     def schedule_shutdown(delay_seconds: int = 60) -> bool:

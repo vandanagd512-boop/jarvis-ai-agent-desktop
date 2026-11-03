@@ -55,6 +55,8 @@ def _record_audio_native_windows(duration: float = 4.5) -> Optional[str]:
     import time
 
     with _mic_lock:
+        if not hasattr(ctypes, "windll"):
+            return None
         tmp_wav = os.path.join(tempfile.gettempdir(), f"jarvis_mic_{int(time.time() * 1000)}.wav")
         winmm = ctypes.windll.winmm
 

@@ -43,21 +43,24 @@ def setup_logging(
 
     # 2. Rotating File Handler
     if log_dir is not None:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "jarvis.log"
-        file_handler = RotatingFileHandler(
-            filename=str(log_file),
-            maxBytes=10 * 1024 * 1024,  # 10 MB per file
-            backupCount=5,
-            encoding="utf-8",
-        )
-        file_formatter = logging.Formatter(
-            fmt="%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-        file_handler.setFormatter(file_formatter)
-        file_handler.setLevel(level)
-        root_logger.addHandler(file_handler)
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_file = log_dir / "jarvis.log"
+            file_handler = RotatingFileHandler(
+                filename=str(log_file),
+                maxBytes=10 * 1024 * 1024,  # 10 MB per file
+                backupCount=5,
+                encoding="utf-8",
+            )
+            file_formatter = logging.Formatter(
+                fmt="%(asctime)s [%(levelname)s] [%(name)s:%(lineno)d] - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+            file_handler.setFormatter(file_formatter)
+            file_handler.setLevel(level)
+            root_logger.addHandler(file_handler)
+        except OSError:
+            pass
 
     _is_initialized = True
 

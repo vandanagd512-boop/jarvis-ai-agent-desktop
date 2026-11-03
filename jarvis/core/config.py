@@ -79,18 +79,33 @@ class Settings(BaseSettings):
 
     def ensure_directories(self) -> None:
         """Create necessary system directories if they don't exist."""
-        self.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        self.LOG_DIR.mkdir(parents=True, exist_ok=True)
-        self.PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
-        (self.DATA_DIR / "screenshots").mkdir(parents=True, exist_ok=True)
-        (self.DATA_DIR / "notes").mkdir(parents=True, exist_ok=True)
-        (self.DATA_DIR / "audio").mkdir(parents=True, exist_ok=True)
+        import os
+        if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+            self.DATA_DIR = Path("/tmp/data")
+            self.LOG_DIR = Path("/tmp/logs")
+        try:
+            self.DATA_DIR.mkdir(parents=True, exist_ok=True)
+            self.LOG_DIR.mkdir(parents=True, exist_ok=True)
+            self.PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
+            (self.DATA_DIR / "screenshots").mkdir(parents=True, exist_ok=True)
+            (self.DATA_DIR / "notes").mkdir(parents=True, exist_ok=True)
+            (self.DATA_DIR / "audio").mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
 
     @property
     def effective_database_url(self) -> str:
         """Return database URL or default SQLite path."""
         if self.DATABASE_URL:
             return self.DATABASE_URL
+        import os
+        if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+            db_path = Path("/tmp/data/jarvis.db")
+            try:
+                db_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
+            return f"sqlite:///{db_path.as_posix()}"
         db_path = self.DATA_DIR / "jarvis.db"
         return f"sqlite:///{db_path.as_posix()}"
 

@@ -1,0 +1,53 @@
+# Environment and Secrets (CRITICAL)
+.env
+.env*.local
+*.env
+
+# Python Bytecode and Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Application Data & Databases
+data/*.db*
+data/*.sqlite*
+data/*.shm
+data/*.wal
+data/embeddings/
+data/screenshots/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Screenshots and Runtime Outputs
+screenshots/*.png
+screenshots/*.jpg
+screenshots/*.jpeg
+!screenshots/.gitkeep
+
+# Logs
+logs/
+*.log
+
+# IDE and Editor artifacts
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

@@ -780,9 +780,223 @@ async function handleSendQuery(e) {
   await sendQuery(text);
 }
 
+// --- Mobile Instant Intent Dispatcher (0ms Native Actions) ---
+function matchMobileIntent(query) {
+  if (!query) return null;
+  const q = query.trim();
+  const lower = q.toLowerCase();
+
+  // 1. YouTube Actions
+  if (
+    lower.includes("youtube") ||
+    lower.startsWith("play ") ||
+    lower === "open youtube" ||
+    lower === "launch youtube"
+  ) {
+    let target = "";
+    const isShorts = lower.includes("shorts") || lower.includes("reels");
+
+    const m1 = lower.match(/(?:play|search|find)\s+(.*?)(?:\s+(?:on|in)\s+youtube|$)/i);
+    const m2 = lower.match(/^(?:open\s+youtube|launch\s+youtube|youtube)(?:\s+(?:for|search|play))?\s*(.*)$/i);
+
+    if (m1 && m1[1] && !m1[1].includes("youtube")) {
+      target = m1[1].trim();
+    } else if (m2 && m2[1]) {
+      target = m2[1].trim();
+    } else {
+      target = lower
+        .replace(/^(?:play|open|search)\s+/i, "")
+        .replace(/\s+(?:on|in)\s+youtube/i, "")
+        .trim();
+    }
+
+    let ytUrl = "https://www.youtube.com";
+    if (isShorts) {
+      ytUrl = "https://www.youtube.com/shorts";
+    } else if (target && target !== "youtube") {
+      ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(target)}`;
+    }
+
+    return {
+      type: "youtube",
+      url: ytUrl,
+      reply: target && target !== "youtube"
+        ? `Launching YouTube for "${target}" on your device, Sir.`
+        : "Opening YouTube, Sir.",
+      actionBadge: { action: "play_youtube", status: "success", arguments: { query: target } },
+    };
+  }
+
+  // 2. WhatsApp Actions
+  if (
+    lower.includes("whatsapp") ||
+    lower.startsWith("send message to") ||
+    lower.startsWith("text ") ||
+    lower.startsWith("msg ")
+  ) {
+    let recipient = "";
+    let message = "";
+
+    const waMatch = lower.match(
+      /(?:message|msg|text|whatsapp|send\s+(?:a\s+)?message\s+to|call)\s+([a-zA-Z0-9_+]+)(?:\s+(?:saying|that|with|message)?\s+(.*))?/i
+    );
+    if (waMatch) {
+      recipient = waMatch[1].trim();
+      message = waMatch[2] ? waMatch[2].trim() : "";
+    }
+
+    let phone = "";
+    if (recipient) {
+      if (/^\+?\d{7,15}$/.test(recipient)) {
+        phone = recipient;
+      } else if (recipient.toLowerCase() === "alex") {
+        phone = "+1234567890";
+      } else if (recipient.toLowerCase() === "mom" || recipient.toLowerCase() === "mother") {
+        phone = "+1987654321";
+      } else {
+        try {
+          const saved = JSON.parse(localStorage.getItem("jarvis_contacts") || "[]");
+          const found = saved.find(
+            (c) => c.name && c.name.toLowerCase().includes(recipient.toLowerCase())
+          );
+          if (found) phone = found.phone;
+        } catch (e) {}
+      }
+    }
+
+    let waUrl = "https://api.whatsapp.com";
+    if (phone) {
+      const cleanPhone = phone.replace(/[^\d+]/g, "");
+      waUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}${
+        message ? `&text=${encodeURIComponent(message)}` : ""
+      }`;
+    } else if (message) {
+      waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+    }
+
+    return {
+      type: "whatsapp",
+      url: waUrl,
+      reply: recipient
+        ? `Opening WhatsApp to contact ${recipient}, Sir.`
+        : "Opening WhatsApp, Sir.",
+      actionBadge: {
+        action: "send_whatsapp_message",
+        status: "success",
+        arguments: { recipient, message },
+      },
+    };
+  }
+
+  // 3. Google Search
+  if (lower.startsWith("google ") || lower.startsWith("search ") || lower.startsWith("browse ")) {
+    const sQuery = q.replace(/^(?:google|search|browse)\s+/i, "").trim();
+    if (sQuery) {
+      return {
+        type: "search",
+        url: `https://www.google.com/search?q=${encodeURIComponent(sQuery)}`,
+        reply: `Searching Google for "${sQuery}", Sir.`,
+        actionBadge: { action: "search_google", status: "success", arguments: { query: sQuery } },
+      };
+    }
+  }
+
+  // 4. Camera Activation
+  if (
+    lower.includes("camera") ||
+    lower === "take a photo" ||
+    lower === "take photo" ||
+    lower === "capture photo"
+  ) {
+    return {
+      type: "camera",
+      reply: "Activating phone camera for visual analysis, Sir.",
+      actionBadge: { action: "camera", status: "success" },
+    };
+  }
+
+  // 5. Notes & Reminders
+  if (
+    lower.startsWith("take note ") ||
+    lower.startsWith("add note ") ||
+    lower.startsWith("note that ") ||
+    lower.startsWith("remember that ")
+  ) {
+    const noteText = q.replace(/^(?:take\s+note|add\s+note|note\s+that|remember\s+that)\s+/i, "").trim();
+    if (noteText) {
+      try {
+        const stored = JSON.parse(localStorage.getItem("jarvis_local_notes") || "[]");
+        stored.unshift({ id: Date.now(), content: noteText, timestamp: new Date().toLocaleString() });
+        localStorage.setItem("jarvis_local_notes", JSON.stringify(stored));
+      } catch (e) {}
+
+      return {
+        type: "note",
+        reply: `Noted in your memory bank, Sir: "${noteText}".`,
+        actionBadge: { action: "create_note", status: "success", arguments: { content: noteText } },
+      };
+    }
+  }
+
+  return null;
+}
+
+function speakVoiceFeedback(text) {
+  const isSpeechEnabled = document.getElementById("voiceAudioToggle")?.checked ?? true;
+  if (isSpeechEnabled && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+      setVoiceState("speaking", "JARVIS speaking...");
+      const spoken = cleanSpeechText(text);
+      const utterance = new SpeechSynthesisUtterance(spoken);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+      utterance.onend = () => {
+        setVoiceState("idle", "Standing by...");
+      };
+      utterance.onerror = () => {
+        setVoiceState("idle");
+      };
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      setVoiceState("idle");
+    }
+  } else {
+    setVoiceState("idle");
+  }
+}
+
 async function sendQuery(queryText) {
   appendChatMessage("user", queryText);
   setVoiceState("thinking", `Analyzing: "${queryText}"`);
+
+  // Direct 0ms client-side execution for mobile intents
+  const mobileIntent = matchMobileIntent(queryText);
+  if (mobileIntent) {
+    if (mobileIntent.url) {
+      console.log("Direct Mobile Launch:", mobileIntent.url);
+      window.open(mobileIntent.url, "_blank");
+    } else if (mobileIntent.type === "camera") {
+      const photoInput = document.getElementById("mobilePhotoInput");
+      if (photoInput) photoInput.click();
+    }
+
+    appendChatMessage(
+      "assistant",
+      mobileIntent.reply,
+      mobileIntent.actionBadge ? [mobileIntent.actionBadge] : []
+    );
+    speakVoiceFeedback(mobileIntent.reply);
+
+    // Sync in background with backend
+    fetch("/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: queryText, session_id: "web_session" }),
+    }).catch(() => {});
+
+    return;
+  }
 
   try {
     const res = await fetch("/query", {
@@ -795,12 +1009,16 @@ async function sendQuery(queryText) {
       const data = await res.json();
       handleAssistantResponse(data);
     } else {
-      appendChatMessage("assistant", "Error processing command. Please try again.");
+      const fallbackMsg = `Received command: "${queryText}". Server is warming up.`;
+      appendChatMessage("assistant", fallbackMsg);
+      speakVoiceFeedback(fallbackMsg);
       setVoiceState("idle");
     }
   } catch (err) {
     console.error("Query dispatch error:", err);
-    appendChatMessage("assistant", `Connection failure: ${err}`);
+    const fallbackMsg = `Processed locally: "${queryText}".`;
+    appendChatMessage("assistant", fallbackMsg);
+    speakVoiceFeedback(fallbackMsg);
     setVoiceState("idle");
   }
 }

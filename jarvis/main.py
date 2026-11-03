@@ -72,7 +72,7 @@ def main() -> None:
         default="web",
         help="Execution mode: futuristic Web Dashboard (default), interactive CLI, voice daemon, or headless API.",
     )
-    parser.add_argument("--host", default="127.0.0.1", help="API/Web server host")
+    parser.add_argument("--host", default="0.0.0.0", help="API/Web server host")
     parser.add_argument("--port", type=int, default=8765, help="API/Web server port")
     parser.add_argument("--no-browser", action="store_true", help="Do not automatically open web browser")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
@@ -86,18 +86,19 @@ def main() -> None:
         import uvicorn
         from jarvis.ui.api_server import app
 
-        url = f"http://{args.host}:{args.port}"
+        local_url = f"http://127.0.0.1:{args.port}"
         print(f"\n=======================================================")
         print(f"  J.A.R.V.I.S. Production Web Dashboard")
-        print(f"  Live at: {url}")
-        print(f"  Hybrid Voice: In-browser voice & background wake-word")
+        print(f"  Local PC:      {local_url}")
+        print(f"  Phone / Wi-Fi: http://10.60.181.160:{args.port}")
+        print(f"  Hybrid Voice:  In-browser voice & background wake-word")
         print(f"=======================================================\n")
 
         # Start desktop wake-word listener in background
         voice_listener.start()
 
         if not args.no_browser:
-            open_browser_delayed(url)
+            open_browser_delayed(local_url)
 
         uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 

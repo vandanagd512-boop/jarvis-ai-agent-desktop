@@ -86,6 +86,20 @@ def get_dashboard_index():
     return FileResponse(str(index_file))
 
 
+@app.get("/manifest.json")
+def get_manifest():
+    """Serve PWA web app manifest."""
+    manifest_file = WEB_DIR / "manifest.json"
+    return FileResponse(str(manifest_file), media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+def get_service_worker():
+    """Serve PWA service worker."""
+    sw_file = WEB_DIR / "sw.js"
+    return FileResponse(str(sw_file), media_type="application/javascript")
+
+
 # --- Telemetry and Health Endpoints ---
 
 @app.get("/health")

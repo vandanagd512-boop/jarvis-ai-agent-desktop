@@ -37,11 +37,16 @@ def get_engine():
         if db_url.startswith("sqlite"):
             @event.listens_for(_engine, "connect")
             def set_sqlite_pragma(dbapi_connection, connection_record):
-                cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA journal_mode=WAL")
-                cursor.execute("PRAGMA synchronous=NORMAL")
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.close()
+                try:
+                    cursor = dbapi_connection.cursor()
+                    import os
+                    if not (os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME")):
+                        cursor.execute("PRAGMA journal_mode=WAL")
+                    cursor.execute("PRAGMA synchronous=NORMAL")
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.close()
+                except Exception as e:
+                    logger.warning(f"Could not apply SQLite pragma: {e}")
 
         # Ensure tables exist
         Base.metadata.create_all(bind=_engine)

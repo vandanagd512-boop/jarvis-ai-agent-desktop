@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +34,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def handle_vercel_rewrites(request: Request, call_next):
+    """Normalize rewritten request paths in Vercel Serverless environment."""
+    if request.url.path in ("/api/index.py", "/api/index", "/api", "/api/"):
+        matched_path = request.headers.get("x-matched-path")
+        if matched_path and matched_path not in ("/api/index.py", "/api/index"):
+            request.scope["path"] = matched_path
+    return await call_next(request)
 
 # Static files path
 WEB_DIR = Path(__file__).resolve().parent / "web"

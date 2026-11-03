@@ -40,6 +40,46 @@ async def vercel_path_rewrite_normalizer(request: Request, call_next):
     return await call_next(request)
 
 
+@app.api_route("/api/index.py", methods=["GET", "POST", "PUT", "DELETE"])
+@app.api_route("/api/index", methods=["GET", "POST", "PUT", "DELETE"])
+@app.api_route("/api", methods=["GET", "POST", "PUT", "DELETE"])
+async def handle_vercel_rewrite_target(request: Request):
+    """Direct dispatcher when Vercel rewrites requests to /api/index.py."""
+    path = (
+        request.headers.get("x-matched-path")
+        or request.headers.get("x-forwarded-uri")
+        or request.headers.get("x-invoke-path")
+        or "/"
+    )
+    if "?" in path:
+        path = path.split("?")[0]
+
+    if path in ("/health", "/api/health"):
+        return health()
+    if path in ("/status", "/api/status"):
+        return status()
+    if path in ("/notes", "/api/notes"):
+        if request.method == "POST":
+            data = await request.json()
+            return create_note(NoteCreateRequest(**data))
+        return get_notes()
+    if path in ("/contacts", "/api/contacts"):
+        return get_contacts()
+    if path in ("/query", "/api/query"):
+        data = await request.json()
+        return await process_query(QueryRequest(**data))
+    if path == "/api/vision/analyze":
+        data = await request.json()
+        return await analyze_vision(VisionRequest(**data))
+
+    return {
+        "status": "online",
+        "service": "JARVIS Cloud Serverless",
+        "resolved_path": path,
+        "available_endpoints": ["/query", "/health", "/status", "/notes", "/contacts", "/api/vision/analyze"],
+    }
+
+
 # In-memory / temporary persistence for serverless
 _notes: List[Dict[str, Any]] = [
     {

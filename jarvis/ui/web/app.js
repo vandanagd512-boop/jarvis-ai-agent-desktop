@@ -819,6 +819,43 @@ function handleAssistantResponse(data) {
   const reply = data.response || "Command processed, Sir.";
   appendChatMessage("assistant", reply, data.actions_executed);
 
+  // Mobile Native Action Triggers: YouTube, WhatsApp, and Google Web search
+  if (data.actions_executed && data.actions_executed.length > 0) {
+    for (const act of data.actions_executed) {
+      if (act.action === "play_youtube") {
+        let ytUrl = "https://www.youtube.com";
+        const q = (act.arguments && act.arguments.query) || "";
+        const mType = (act.arguments && act.arguments.media_type) || "";
+        if (mType === "reels" || q.toLowerCase().includes("reels") || q.toLowerCase().includes("shorts")) {
+          ytUrl = "https://www.youtube.com/shorts";
+        } else if (q) {
+          ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+        }
+        console.log("Launching YouTube on mobile:", ytUrl);
+        setTimeout(() => { window.open(ytUrl, "_blank"); }, 600);
+      } else if (act.action === "send_whatsapp_message" || act.action === "whatsapp_call") {
+        let targetPhone = "";
+        if (act.result && typeof act.result === "string" && act.result.includes("phone': '")) {
+          const m = act.result.match(/phone':\s*'([^']+)'/);
+          if (m) targetPhone = m[1];
+        }
+        if (!targetPhone && act.result && act.result.phone) targetPhone = act.result.phone;
+        if (!targetPhone && act.arguments && act.arguments.recipient) targetPhone = act.arguments.recipient;
+
+        if (targetPhone && !targetPhone.includes("not found")) {
+          const cleanPhone = targetPhone.replace(/[^\d+]/g, "");
+          const msg = (act.arguments && act.arguments.message) ? encodeURIComponent(act.arguments.message) : "";
+          const waUrl = cleanPhone ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${msg}` : "https://web.whatsapp.com";
+          console.log("Launching WhatsApp on mobile:", waUrl);
+          setTimeout(() => { window.open(waUrl, "_blank"); }, 600);
+        }
+      } else if (act.action === "search_google" && act.arguments && act.arguments.query) {
+        const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(act.arguments.query)}`;
+        setTimeout(() => { window.open(googleUrl, "_blank"); }, 600);
+      }
+    }
+  }
+
   // Text-To-Speech Output via Web Speech if enabled
   const isSpeechEnabled = document.getElementById("voiceAudioToggle").checked;
   if (isSpeechEnabled && "speechSynthesis" in window) {
@@ -1011,6 +1048,42 @@ async function analyzeScreenVision() {
   } catch (err) {
     output.innerText = `Vision analysis error: ${err}`;
   }
+}
+
+async function handleMobilePhotoUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const dataUrl = e.target.result;
+    const container = document.getElementById("screenshotContainer");
+    container.innerHTML = `<img src="${dataUrl}" class="rounded-lg max-h-60 border border-cyan-400 shadow-[0_0_15px_rgba(0,242,254,0.4)] object-contain" alt="Mobile Photo">`;
+
+    const output = document.getElementById("visionOutputText");
+    output.innerText = "Analyzing photo with Gemini Multimodal Vision AI...";
+
+    try {
+      const base64Data = dataUrl.split(",")[1];
+      const res = await fetch("/api/vision/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_base64: base64Data, query: "Describe and explain what you see in this photo in detail, Sir." })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const desc = data.analysis || "Photo analyzed successfully.";
+        output.innerText = desc;
+        appendChatMessage("assistant", `Photo Analysis:\n${desc}`);
+        handleAssistantResponse({ response: desc });
+      } else {
+        output.innerText = "Error analyzing mobile photo.";
+      }
+    } catch (err) {
+      output.innerText = `Photo analysis error: ${err}`;
+    }
+  };
+  reader.readAsDataURL(file);
 }
 
 // --- Contacts & WhatsApp Integration ---

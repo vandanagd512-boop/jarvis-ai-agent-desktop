@@ -117,6 +117,7 @@ def get_system_status() -> Dict[str, Any]:
 
 
 @app.post("/query")
+@app.post("/api/query")
 def process_user_query(req: QueryRequest) -> Dict[str, Any]:
     """Execute query via action router."""
     if not req.query.strip():
@@ -296,9 +297,24 @@ def get_latest_screenshot():
     return FileResponse(str(_latest_screenshot_path), media_type="image/png")
 
 
+class VisionRequest(BaseModel):
+    image_base64: Optional[str] = None
+    query: Optional[str] = "Describe what is visible in this image in detail."
+
+
 @app.post("/api/vision/analyze")
-def analyze_vision_endpoint() -> Dict[str, Any]:
-    """Analyze current screen using OCR and multimodal vision."""
+def analyze_vision_endpoint(req: Optional[VisionRequest] = None) -> Dict[str, Any]:
+    """Analyze current screen or uploaded mobile camera photo."""
+    if req and req.image_base64:
+        import base64
+        import io
+        from PIL import Image
+        try:
+            raw_bytes = base64.b64decode(req.image_base64)
+            img = Image.open(io.BytesIO(raw_bytes))
+            return vision_analyzer.analyze_image(img, query=req.query or "Describe what is visible in this image in detail.")
+        except Exception as e:
+            return {"success": False, "error": f"Failed to decode image: {e}"}
     return vision_analyzer.analyze_screen()
 
 

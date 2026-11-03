@@ -497,10 +497,14 @@
 
         <!-- Vision / OCR Controls & Analysis Output -->
         <div class="md:col-span-5 flex flex-col justify-between space-y-3">
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button onclick="takeScreenshot()" class="btn-neon flex-1 text-xs py-2 justify-center">
               <i class="fa-solid fa-camera"></i> Capture Screen
             </button>
+            <label class="btn-neon flex-1 text-xs py-2 justify-center cursor-pointer flex items-center gap-1.5 text-cyan-300">
+              <i class="fa-solid fa-mobile-screen"></i> Phone Camera
+              <input type="file" id="mobilePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="handleMobilePhotoUpload(event)">
+            </label>
             <button onclick="analyzeScreenVision()" class="btn-neon flex-1 text-xs py-2 justify-center">
               <i class="fa-solid fa-magnifying-glass-chart"></i> Analyze Vision
             </button>

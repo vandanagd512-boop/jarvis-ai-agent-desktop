@@ -17,6 +17,37 @@ class VisionAnalyzer:
     def __init__(self) -> None:
         self.gemini = GeminiProvider()
 
+    def analyze_image(self, img: Any, query: str = "Describe what is visible in this image in detail.") -> Dict[str, Any]:
+        """Analyze an image directly (from mobile phone camera upload or screenshot)."""
+        if self.gemini.is_available():
+            try:
+                from google.genai import types
+                import io
+                buf = io.BytesIO()
+                img.save(buf, format="PNG")
+                image_bytes = buf.getvalue()
+                image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/png")
+
+                res = self.gemini._client.models.generate_content(
+                    model=self.gemini.model_name,
+                    contents=[image_part, query],
+                )
+                analysis_text = res.text if hasattr(res, "text") else "No visual description generated."
+                return {
+                    "success": True,
+                    "engine": "gemini_multimodal",
+                    "analysis": analysis_text,
+                }
+            except Exception as exc:
+                logger.warning(f"Gemini vision analysis failed: {exc}")
+
+        ocr_res = ocr_engine.extract_text_from_image(img)
+        return {
+            "success": True,
+            "engine": "ocr",
+            "analysis": f"Extracted Text: {ocr_res.get('text', '')[:300]}",
+        }
+
     def analyze_screen(self, query: str = "Describe what is currently visible on the screen.") -> Dict[str, Any]:
         """Capture screenshot and analyze its contents."""
         cap_result = screen_capture.capture_full_screen()

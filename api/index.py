@@ -29,57 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.middleware("http")
-async def vercel_path_rewrite_normalizer(request: Request, call_next):
-    """Normalize rewritten request paths in Vercel serverless environment."""
-    if request.url.path in ("/api/index.py", "/api/index", "/api", "/api/"):
-        matched = request.headers.get("x-matched-path")
-        if matched and matched not in ("/api/index.py", "/api/index"):
-            request.scope["path"] = matched
-    return await call_next(request)
-
-
-@app.api_route("/api/index.py", methods=["GET", "POST", "PUT", "DELETE"])
-@app.api_route("/api/index", methods=["GET", "POST", "PUT", "DELETE"])
-@app.api_route("/api", methods=["GET", "POST", "PUT", "DELETE"])
-async def handle_vercel_rewrite_target(request: Request):
-    """Direct dispatcher when Vercel rewrites requests to /api/index.py."""
-    path = (
-        request.headers.get("x-matched-path")
-        or request.headers.get("x-forwarded-uri")
-        or request.headers.get("x-invoke-path")
-        or "/"
-    )
-    if "?" in path:
-        path = path.split("?")[0]
-
-    if path in ("/health", "/api/health"):
-        return health()
-    if path in ("/status", "/api/status"):
-        return status()
-    if path in ("/notes", "/api/notes"):
-        if request.method == "POST":
-            data = await request.json()
-            return create_note(NoteCreateRequest(**data))
-        return get_notes()
-    if path in ("/contacts", "/api/contacts"):
-        return get_contacts()
-    if path in ("/query", "/api/query"):
-        data = await request.json()
-        return await process_query(QueryRequest(**data))
-    if path == "/api/vision/analyze":
-        data = await request.json()
-        return await analyze_vision(VisionRequest(**data))
-
-    return {
-        "status": "online",
-        "service": "JARVIS Cloud Serverless",
-        "resolved_path": path,
-        "available_endpoints": ["/query", "/health", "/status", "/notes", "/contacts", "/api/vision/analyze"],
-    }
-
-
 # In-memory / temporary persistence for serverless
 _notes: List[Dict[str, Any]] = [
     {
@@ -112,14 +61,10 @@ class VisionRequest(BaseModel):
     prompt: Optional[str] = "Describe what you see in detail and suggest any relevant actions."
 
 
-@app.get("/health")
-@app.get("/api/health")
 def health() -> Dict[str, Any]:
     return {"status": "ok", "platform": "vercel_serverless", "timestamp": time.time()}
 
 
-@app.get("/status")
-@app.get("/api/status")
 def status() -> Dict[str, Any]:
     return {
         "status": "online",
@@ -137,14 +82,10 @@ def status() -> Dict[str, Any]:
     }
 
 
-@app.get("/notes")
-@app.get("/api/notes")
 def get_notes() -> List[Dict[str, Any]]:
     return _notes
 
 
-@app.post("/notes")
-@app.post("/api/notes")
 def create_note(req: NoteCreateRequest) -> Dict[str, Any]:
     note = {
         "id": len(_notes) + 1,
@@ -156,14 +97,10 @@ def create_note(req: NoteCreateRequest) -> Dict[str, Any]:
     return {"success": True, "note": note}
 
 
-@app.get("/contacts")
-@app.get("/api/contacts")
 def get_contacts() -> List[Dict[str, str]]:
     return _contacts
 
 
-@app.post("/query")
-@app.post("/api/query")
 async def process_query(req: QueryRequest) -> Dict[str, Any]:
     query = req.query.strip()
     lower = query.lower()
@@ -253,7 +190,7 @@ async def process_query(req: QueryRequest) -> Dict[str, Any]:
                 "actions_executed": [],
                 "mode": "gemini_cloud",
             }
-        except Exception as exc:
+        except Exception:
             pass
 
     # 5. Offline Fallback
@@ -265,7 +202,6 @@ async def process_query(req: QueryRequest) -> Dict[str, Any]:
     }
 
 
-@app.post("/api/vision/analyze")
 async def analyze_vision(req: VisionRequest) -> Dict[str, Any]:
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key:
@@ -290,3 +226,43 @@ async def analyze_vision(req: VisionRequest) -> Dict[str, Any]:
         return {"success": True, "analysis": response.text.strip()}
     except Exception as exc:
         return {"success": False, "analysis": f"Vision analysis error: {exc}"}
+
+
+# --- Universal Route Dispatcher for Vercel Serverless ---
+@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def universal_dispatcher(request: Request, path_name: str = ""):
+    raw_path = request.url.path.lower()
+    fw_path = (request.headers.get("x-forwarded-uri") or request.headers.get("x-invoke-path") or "").lower()
+    match_path = (request.headers.get("x-matched-path") or "").lower()
+    check_str = f"{raw_path} {path_name.lower()} {fw_path} {match_path}"
+
+    if "health" in check_str:
+        return health()
+    if "status" in check_str:
+        return status()
+    if "contacts" in check_str:
+        return get_contacts()
+    if "notes" in check_str:
+        if request.method == "POST":
+            data = await request.json()
+            return create_note(NoteCreateRequest(**data))
+        return get_notes()
+
+    # POST payload inspection
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            if "query" in body:
+                return await process_query(QueryRequest(**body))
+            if "image_base64" in body:
+                return await analyze_vision(VisionRequest(**body))
+            if "title" in body and "content" in body:
+                return create_note(NoteCreateRequest(**body))
+        except Exception:
+            pass
+
+    return {
+        "status": "online",
+        "service": "JARVIS Cloud Serverless",
+        "endpoints": ["/query", "/health", "/status", "/notes", "/contacts", "/api/vision/analyze"],
+    }

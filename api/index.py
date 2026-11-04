@@ -303,6 +303,38 @@ async def analyze_vision(req: VisionRequest) -> Dict[str, Any]:
     }
 
 
+# --- Explicit Named Routes for Vercel Serverless ---
+@app.post("/query")
+@app.post("/api/query")
+async def handle_post_query(req: QueryRequest):
+    return await process_query(req)
+
+@app.post("/api/vision/analyze")
+@app.post("/vision")
+async def handle_post_vision(req: VisionRequest):
+    return await analyze_vision(req)
+
+@app.get("/health")
+def handle_get_health():
+    return health()
+
+@app.get("/status")
+def handle_get_status():
+    return status()
+
+@app.get("/contacts")
+def handle_get_contacts():
+    return get_contacts()
+
+@app.get("/notes")
+def handle_get_notes():
+    return get_notes()
+
+@app.post("/notes")
+def handle_post_notes(req: NoteCreateRequest):
+    return create_note(req)
+
+
 # --- Universal Route Dispatcher for Vercel Serverless ---
 @app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def universal_dispatcher(request: Request, path_name: str = ""):

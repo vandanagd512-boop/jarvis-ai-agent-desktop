@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>J.A.R.V.I.S. - Windows AI Desktop Assistant</title>
+  <title>J.A.R.V.I.S. - Hands-Free AI Voice & Vision Assistant</title>
   
   <!-- Mobile & PWA App Configuration -->
   <link rel="manifest" href="/manifest.json">
@@ -20,289 +20,138 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="p-4 md:p-6 select-none">
+<body class="p-3 md:p-6 select-none bg-slate-950 text-white min-h-screen">
   <div class="scanlines"></div>
 
   <!-- Top Navigation Header -->
-  <header class="glass-panel p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
+  <header class="glass-panel p-4 mb-4 flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-full border border-cyan-400 flex items-center justify-center bg-cyan-950/40 shadow-[0_0_15px_rgba(0,242,254,0.3)]">
+      <div class="w-10 h-10 rounded-full border-2 border-cyan-400 flex items-center justify-center bg-cyan-950/40 shadow-[0_0_15px_rgba(0,242,254,0.4)]">
         <i class="fa-solid fa-atom text-cyan-400 text-lg animate-spin" style="animation-duration: 12s;"></i>
       </div>
       <div>
         <h1 class="text-xl md:text-2xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
           J.A.R.V.I.S.
         </h1>
-        <p class="text-xs text-cyan-200/70 tracking-wider">WINDOWS AI DESKTOP ASSISTANT</p>
+        <p class="text-[11px] text-cyan-300 font-bold tracking-wider">AI EYES & HANDS-FREE ASSISTANT</p>
       </div>
     </div>
 
-    <!-- Live Context Badge -->
-    <div class="flex items-center gap-6">
-      <div class="hidden md:flex flex-col text-right">
-        <span class="text-xs text-gray-400 uppercase tracking-wider">Active Window</span>
-        <span id="activeWindowText" class="text-sm font-semibold text-cyan-300 truncate max-w-xs">Desktop</span>
+    <!-- Battery, Uptime & Hands-Free Status -->
+    <div class="flex items-center gap-2 sm:gap-4 ml-auto">
+      <!-- Battery Status -->
+      <div class="bg-black/50 px-3 py-1.5 rounded-xl border border-cyan-500/30 flex items-center gap-1.5">
+        <span id="batteryText" class="text-xs font-bold text-cyan-300 font-mono">
+          <i class="fa-solid fa-battery-three-quarters text-emerald-400 mr-1"></i>--%
+        </span>
       </div>
 
-      <div class="flex items-center gap-3 bg-black/40 px-3 py-1.5 rounded-full border border-cyan-500/30">
-        <span id="systemStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#00f5a0]"></span>
-        <span id="systemStatusText" class="text-xs font-bold tracking-wider text-emerald-400 uppercase">ONLINE</span>
+      <!-- Clock -->
+      <div class="bg-black/50 px-3 py-1.5 rounded-xl border border-cyan-500/30 text-right">
+        <div id="liveClock" class="text-xs font-mono font-bold text-cyan-300">00:00:00</div>
       </div>
 
-      <!-- Live Clock -->
-      <div class="text-right">
-        <div id="liveClock" class="text-lg font-mono font-bold text-cyan-400">00:00:00</div>
-        <div id="liveDate" class="text-xs text-gray-400">Loading...</div>
-      </div>
+      <!-- Hands-Free Active Indicator -->
+      <button onclick="toggleHandsFreeMode()" type="button" class="flex items-center gap-2 bg-emerald-950/60 hover:bg-emerald-900/80 px-3 py-1.5 rounded-xl border border-emerald-400 text-emerald-300 shadow-[0_0_12px_rgba(0,245,160,0.3)] transition" title="Tap to Toggle Hands-Free Listening">
+        <span id="handsFreeDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="handsFreeBadgeText" class="text-xs font-bold uppercase tracking-wider hidden sm:inline">HANDS-FREE ON</span>
+        <i class="fa-solid fa-microphone text-xs sm:hidden"></i>
+      </button>
     </div>
   </header>
 
-  <!-- Main Hero Grid: Arc Reactor / Voice Visualizer & Telemetry -->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+  <!-- Hero: Hands-Free Voice Reactor & Quick Voice Cards -->
+  <div class="glass-panel p-5 mb-5 flex flex-col items-center justify-center text-center relative overflow-hidden">
     
-    <!-- Left: Telemetry Gauges (4 cols) -->
-    <div class="lg:col-span-4 glass-panel p-5 flex flex-col justify-between">
-      <h2 class="text-sm font-bold tracking-widest text-cyan-400 uppercase mb-4 flex items-center gap-2">
-        <i class="fa-solid fa-microchip"></i> System Telemetry
-      </h2>
-
-      <div class="space-y-4">
-        <!-- CPU Load -->
-        <div>
-          <div class="flex justify-between text-xs font-semibold mb-1">
-            <span class="text-gray-300">CPU UTILIZATION</span>
-            <span id="cpuValText" class="text-cyan-400 font-mono">0.0%</span>
-          </div>
-          <div class="progress-track">
-            <div id="cpuBar" class="progress-bar-cyan" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <!-- RAM Load -->
-        <div>
-          <div class="flex justify-between text-xs font-semibold mb-1">
-            <span class="text-gray-300">MEMORY (RAM)</span>
-            <span id="ramValText" class="text-cyan-400 font-mono">0.0 / 0.0 GB (0%)</span>
-          </div>
-          <div class="progress-track">
-            <div id="ramBar" class="progress-bar-cyan" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <!-- Disk C: Usage -->
-        <div>
-          <div class="flex justify-between text-xs font-semibold mb-1">
-            <span class="text-gray-300">DISK DRIVE (C:)</span>
-            <span id="diskValText" class="text-cyan-400 font-mono">0.0 GB Used / 0.0 GB Free</span>
-          </div>
-          <div class="progress-track">
-            <div id="diskBar" class="progress-bar-cyan" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <!-- Battery & Uptime Grid -->
-        <div class="grid grid-cols-2 gap-3 pt-2">
-          <div class="bg-black/30 p-2.5 rounded-lg border border-cyan-500/20">
-            <span class="text-[10px] text-gray-400 uppercase block">Battery State</span>
-            <span id="batteryText" class="text-sm font-bold text-cyan-300 font-mono flex items-center gap-1.5 mt-0.5">
-              <i class="fa-solid fa-battery-half text-cyan-400"></i> --%
-            </span>
-          </div>
-          <div class="bg-black/30 p-2.5 rounded-lg border border-cyan-500/20">
-            <span class="text-[10px] text-gray-400 uppercase block">System Uptime</span>
-            <span id="uptimeText" class="text-sm font-bold text-cyan-300 font-mono mt-0.5 block">--h --m</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Status Footer -->
-      <div class="mt-4 pt-3 border-t border-cyan-500/20 flex items-center justify-between text-xs text-gray-400">
-        <span>Reasoning Engine:</span>
-        <span id="engineBadge" class="font-semibold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-500/30">
-          HYBRID (Gemini + Offline)
-        </span>
+    <!-- Arc Reactor Voice Visualizer Container -->
+    <div id="voiceOrb" class="orb-container cursor-pointer my-2" onclick="toggleVoiceListening()" title="Click to Speak or Toggle Voice Listening">
+      <canvas id="visualizerCanvas" width="220" height="220"></canvas>
+      <div class="arc-outer-ring"></div>
+      <div class="arc-middle-ring"></div>
+      <div class="arc-inner-ring"></div>
+      <div class="arc-core">
+        <i id="orbIcon" class="fa-solid fa-microphone text-3xl text-cyan-950 transition-transform"></i>
       </div>
     </div>
 
-    <!-- Center: Arc Reactor & Reactive Voice Orb (5 cols) -->
-    <div class="lg:col-span-5 glass-panel p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
-      <!-- Arc Reactor Animation Container -->
-      <div id="voiceOrb" class="orb-container" title="Click to Talk / Toggle Voice Command">
-        <canvas id="visualizerCanvas" width="220" height="220"></canvas>
-        <div class="arc-outer-ring"></div>
-        <div class="arc-middle-ring"></div>
-        <div class="arc-inner-ring"></div>
-        <div class="arc-core">
-          <i id="orbIcon" class="fa-solid fa-microphone text-2xl text-cyan-950 transition-transform"></i>
-        </div>
-      </div>
-
-      <!-- Voice State Badge -->
-      <div class="mt-5">
-        <span id="voiceStateBadge" class="px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 shadow-[0_0_12px_rgba(0,242,254,0.3)]">
-          STANDBY (CLICK TO TALK)
-        </span>
-      </div>
-
-      <!-- Transcription Feedback -->
-      <p id="liveTranscript" class="text-sm text-cyan-100/90 italic mt-2 min-h-[1.5rem] px-4 font-mono">
-        "Say 'Jarvis' or click the reactor..."
-      </p>
-
-      <!-- Live Speech Scratchpad & Real-Time Correction Box -->
-      <div class="w-full max-w-lg mt-2 px-2">
-        <div class="relative bg-black/60 border border-cyan-500/40 rounded-xl p-3 shadow-[0_0_15px_rgba(0,242,254,0.15)] flex flex-col gap-2 focus-within:border-cyan-400 focus-within:shadow-[0_0_20px_rgba(0,242,254,0.3)] transition-all">
-          <div class="flex items-center justify-between text-[11px] text-cyan-400 font-mono">
-            <span class="flex items-center gap-1.5 font-bold">
-              <span id="scratchpadDot" class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-              LIVE SPEECH SCRATCHPAD
-            </span>
-            <span id="scratchpadStatus" class="text-xs text-cyan-300 font-medium">Ready • Live correction active</span>
-          </div>
-          
-          <div class="relative">
-            <textarea id="liveScratchpad" rows="2" class="w-full bg-black/40 border border-cyan-900/60 rounded-lg p-2 text-sm text-cyan-100 placeholder-cyan-500/40 focus:outline-none focus:border-cyan-500/80 resize-none font-mono" placeholder="Words appear live as you speak... You can edit or correct anything before running!"></textarea>
-          </div>
-
-          <div class="flex items-center justify-between pt-1 border-t border-cyan-500/20 text-xs">
-            <div class="flex items-center gap-2">
-              <span id="execSpeedBadge" class="text-[11px] text-emerald-400 font-mono flex items-center gap-1">
-                <i class="fa-solid fa-bolt text-amber-300"></i> Fast Path (15ms)
-              </span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="diagnosticsBtn" onclick="runSelfDiagnostics()" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-amber-300 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-500/40 transition flex items-center gap-1 shadow-sm">
-                <i class="fa-solid fa-stethoscope text-amber-400"></i> Auto Test
-              </button>
-              <button id="clearScratchpadBtn" type="button" class="px-2.5 py-1 rounded text-xs text-gray-400 hover:text-cyan-300 hover:bg-cyan-950/40 transition">
-                <i class="fa-solid fa-rotate-left mr-1"></i> Clear
-              </button>
-              <button id="executeScratchpadBtn" type="button" class="px-4 py-1.5 rounded-lg text-xs font-bold text-cyan-950 bg-gradient-to-r from-cyan-400 to-blue-400 hover:from-cyan-300 hover:to-blue-300 shadow-[0_0_12px_rgba(0,242,254,0.4)] transition flex items-center gap-1">
-                <i class="fa-solid fa-play"></i> Run Command
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Keyboard Hint -->
-      <div class="text-[11px] text-gray-400 mt-2 flex items-center gap-2">
-        <span>Shortcut:</span>
-        <kbd class="bg-black/50 border border-gray-600 px-1.5 py-0.5 rounded text-[10px] font-mono text-cyan-300">Spacebar</kbd>
-        <span>to talk | Wake Word: <strong class="text-cyan-300">"Jarvis"</strong></span>
-      </div>
+    <!-- Live Voice State Indicator -->
+    <div class="mt-3">
+      <span id="voiceStateBadge" class="px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 shadow-[0_0_12px_rgba(0,242,254,0.3)]">
+        🎙️ HANDS-FREE LISTENING (SPEAK FREELY)
+      </span>
     </div>
 
-    <!-- Right: Quick Windows Action Deck (3 cols) -->
-    <div class="lg:col-span-3 glass-panel p-5 flex flex-col justify-between">
-      <h2 class="text-sm font-bold tracking-widest text-cyan-400 uppercase mb-3 flex items-center gap-2">
-        <i class="fa-brands fa-windows"></i> Quick Windows Controls
-      </h2>
+    <!-- Live Spoken Transcript -->
+    <p id="liveTranscript" class="text-sm md:text-base text-cyan-100 font-medium italic mt-2 min-h-[1.8rem] px-4 font-mono">
+      "Say: 'What do you see?', 'Open WhatsApp', 'What time is it?', 'Play music'..."
+    </p>
 
-      <!-- App Launchers Grid -->
-      <div class="grid grid-cols-2 gap-2 mb-4">
-        <button onclick="launchApp('whatsapp')" class="btn-neon text-xs py-2 justify-center border-green-500/40 hover:border-green-400">
-          <i class="fa-brands fa-whatsapp text-green-400"></i> WhatsApp
-        </button>
-        <button onclick="launchApp('instagram')" class="btn-neon text-xs py-2 justify-center border-pink-500/40 hover:border-pink-400">
-          <i class="fa-brands fa-instagram text-pink-400"></i> Instagram
-        </button>
-        <button onclick="launchApp('youtube')" class="btn-neon text-xs py-2 justify-center border-red-500/40 hover:border-red-400">
-          <i class="fa-brands fa-youtube text-red-500"></i> YouTube
-        </button>
-        <button onclick="launchApp('chrome')" class="btn-neon text-xs py-2 justify-center">
-          <i class="fa-brands fa-chrome text-amber-300"></i> Chrome
-        </button>
-        <button onclick="launchApp('notepad')" class="btn-neon text-xs py-2 justify-center">
-          <i class="fa-solid fa-file-lines text-cyan-400"></i> Notepad
-        </button>
-        <button onclick="launchApp('calc')" class="btn-neon text-xs py-2 justify-center">
-          <i class="fa-solid fa-calculator text-blue-400"></i> Calculator
-        </button>
-        <button onclick="launchApp('code')" class="btn-neon text-xs py-2 justify-center">
-          <i class="fa-solid fa-code text-indigo-400"></i> VS Code
-        </button>
-        <button onclick="launchApp('explorer')" class="btn-neon text-xs py-2 justify-center">
-          <i class="fa-solid fa-folder-open text-amber-400"></i> Explorer
-        </button>
-      </div>
+    <!-- Hands-Free Audio Guidance Notice for Blind Users -->
+    <div class="text-[11px] text-gray-400 mt-1 flex items-center gap-2">
+      <i class="fa-solid fa-ear-listen text-cyan-400"></i>
+      <span>Eyes-Free Mode: Speak naturally without pressing buttons. JARVIS replies out loud.</span>
+    </div>
 
-      <!-- Hardware Controls -->
-      <div class="space-y-3 pt-2 border-t border-cyan-500/20">
-        <!-- Volume -->
-        <div class="flex items-center justify-between gap-2">
-          <button onclick="triggerAction('volume_down')" class="btn-neon px-2.5 py-1 text-xs" title="Volume Down">
-            <i class="fa-solid fa-volume-low"></i>
-          </button>
-          <button onclick="triggerAction('toggle_mute')" class="btn-neon px-2.5 py-1 text-xs" title="Toggle Mute">
-            <i class="fa-solid fa-volume-xmark"></i>
-          </button>
-          <button onclick="triggerAction('volume_up')" class="btn-neon px-2.5 py-1 text-xs" title="Volume Up">
-            <i class="fa-solid fa-volume-high"></i>
-          </button>
-        </div>
+    <!-- Quick Voice Cards (Big High-Contrast Buttons for Blind & One-Touch Access) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-2xl mt-5">
+      <!-- 1. Camera Eyes & OCR -->
+      <button onclick="triggerVoiceVisionCamera()" type="button" class="p-3.5 bg-cyan-950/50 hover:bg-cyan-900/70 border-2 border-cyan-400 rounded-xl flex flex-col items-center justify-center gap-1.5 transition text-center shadow-[0_0_15px_rgba(0,242,254,0.2)]">
+        <i class="fa-solid fa-eye text-2xl text-cyan-400"></i>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">👁️ What Do You See?</span>
+        <span class="text-[10px] text-cyan-300">Read Text / Describe Scene</span>
+      </button>
 
-        <!-- Media playback -->
-        <div class="flex items-center justify-center gap-2">
-          <button onclick="triggerAction('media_previous')" class="btn-neon px-3 py-1 text-xs" title="Previous Track">
-            <i class="fa-solid fa-backward-step"></i>
-          </button>
-          <button onclick="triggerAction('media_play_pause')" class="btn-neon px-4 py-1 text-xs" title="Play / Pause">
-            <i class="fa-solid fa-play"></i>
-          </button>
-          <button onclick="triggerAction('media_next')" class="btn-neon px-3 py-1 text-xs" title="Next Track">
-            <i class="fa-solid fa-forward-step"></i>
-          </button>
-        </div>
+      <!-- 2. WhatsApp -->
+      <button onclick="launchApp('whatsapp')" type="button" class="p-3.5 bg-green-950/50 hover:bg-green-900/70 border-2 border-green-500 rounded-xl flex flex-col items-center justify-center gap-1.5 transition text-center shadow-[0_0_15px_rgba(34,197,94,0.2)]">
+        <i class="fa-brands fa-whatsapp text-2xl text-green-400"></i>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">💬 Open WhatsApp</span>
+        <span class="text-[10px] text-green-300">Direct Chat & Calling</span>
+      </button>
 
-        <!-- System Lock & Screenshot -->
-        <div class="grid grid-cols-2 gap-2 pt-1">
-          <button onclick="triggerAction('lock_workstation')" class="btn-neon btn-neon-danger text-xs py-1.5 justify-center">
-            <i class="fa-solid fa-lock"></i> Lock PC
-          </button>
-          <button onclick="takeScreenshot()" class="btn-neon text-xs py-1.5 justify-center">
-            <i class="fa-solid fa-camera"></i> Screen
-          </button>
-        </div>
-      </div>
+      <!-- 3. YouTube -->
+      <button onclick="launchApp('youtube')" type="button" class="p-3.5 bg-red-950/50 hover:bg-red-900/70 border-2 border-red-500 rounded-xl flex flex-col items-center justify-center gap-1.5 transition text-center shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+        <i class="fa-brands fa-youtube text-2xl text-red-500"></i>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">📺 Open YouTube</span>
+        <span class="text-[10px] text-red-300">Play Music & Podcasts</span>
+      </button>
+
+      <!-- 4. Read Notes Aloud -->
+      <button onclick="readNotesAloud()" type="button" class="p-3.5 bg-amber-950/50 hover:bg-amber-900/70 border-2 border-amber-500 rounded-xl flex flex-col items-center justify-center gap-1.5 transition text-center shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+        <i class="fa-solid fa-volume-high text-2xl text-amber-400"></i>
+        <span class="text-xs font-bold text-white uppercase tracking-wider">🔊 Read Notes Aloud</span>
+        <span class="text-[10px] text-amber-300">Spoken Notes & Checklist</span>
+      </button>
     </div>
   </div>
 
-  <!-- Operational Tabbed Workspace -->
-  <div class="glass-panel p-5">
-    <!-- Tabs Header: Mobile Responsive & Scrollable Strip -->
+  <!-- Operational Workspace: 3 Clean Accessible Tabs -->
+  <div class="glass-panel p-4 md:p-5">
+    
+    <!-- Tab Strip -->
     <div class="flex items-center justify-between border-b border-cyan-500/20 pb-2 mb-3 gap-2">
-      <div class="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-        <button id="tabBtnChat" onclick="switchTab('chat')" class="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 bg-cyan-500/30 text-cyan-300 border border-cyan-400">
-          <i class="fa-solid fa-comments mr-1"></i> Chat
+      <div class="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <button id="tabBtnChat" onclick="switchTab('chat')" class="px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 bg-cyan-500/30 text-cyan-300 border border-cyan-400">
+          <i class="fa-solid fa-comments mr-1"></i> Conversation
         </button>
-        <button id="tabBtnWorkflows" onclick="switchTab('workflows')" class="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 text-gray-400 hover:text-cyan-300">
-          <i class="fa-solid fa-diagram-project mr-1"></i> Workflows
+        <button id="tabBtnVision" onclick="switchTab('vision')" class="px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 text-gray-400 hover:text-cyan-300">
+          <i class="fa-solid fa-eye mr-1 text-cyan-400"></i> Visual Assistant (Camera)
         </button>
-        <button id="tabBtnNotes" onclick="switchTab('notes')" class="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 text-gray-400 hover:text-cyan-300">
+        <button id="tabBtnNotes" onclick="switchTab('notes')" class="px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 text-gray-400 hover:text-cyan-300">
           <i class="fa-solid fa-note-sticky mr-1"></i> Notes & Tasks
-        </button>
-        <button id="tabBtnWhatsapp" onclick="switchTab('whatsapp')" class="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 text-gray-400 hover:text-green-300">
-          <i class="fa-brands fa-whatsapp mr-1 text-green-400"></i> WhatsApp
-        </button>
-        <button id="tabBtnVision" onclick="switchTab('vision')" class="px-3 py-1.5 rounded-lg text-xs font-bold tracking-wider uppercase whitespace-nowrap transition-all shrink-0 text-gray-400 hover:text-cyan-300">
-          <i class="fa-solid fa-eye mr-1 text-cyan-400"></i> Vision & OCR
         </button>
       </div>
 
-      <!-- Speech Output Toggle -->
+      <!-- Spoken Audio Toggle -->
       <div class="flex items-center gap-2 shrink-0">
         <label class="text-xs text-gray-300 flex items-center gap-1.5 cursor-pointer">
           <input type="checkbox" id="voiceAudioToggle" checked class="accent-cyan-400 cursor-pointer">
-          <span class="hidden sm:inline">Speak (TTS)</span>
-          <span class="sm:hidden"><i class="fa-solid fa-volume-high text-cyan-400"></i></span>
+          <span>Speak (TTS)</span>
         </label>
       </div>
     </div>
 
     <!-- Tab 1: Live Conversation Feed -->
     <div id="tabContentChat" class="space-y-4">
-      <!-- Conversation History Container -->
       <div id="chatMessages" class="h-80 overflow-y-auto space-y-3 pr-2 font-sans">
         <!-- Initial Welcome Message -->
         <div class="flex items-start gap-3">
@@ -312,22 +161,22 @@
           <div class="bg-cyan-950/40 border border-cyan-500/20 p-3 rounded-xl rounded-tl-none max-w-2xl">
             <span class="text-xs text-cyan-400 font-bold block mb-1">JARVIS</span>
             <p class="text-sm text-gray-200">
-              Good day, Sir. All systems are operational. I am standing by for your commands via voice, text, or the dashboard controls.
+              Good day, Sir. Hands-free voice mode is active. You can speak naturally without touching any buttons. Point your camera and ask "What do you see?" or say "Open WhatsApp", "What time is it?", or "Play music".
             </p>
           </div>
         </div>
       </div>
 
-      <!-- Query Input Form -->
+      <!-- Text / Voice Query Bar -->
       <form id="chatForm" onsubmit="handleSendQuery(event)" class="flex gap-2 pt-2">
         <input 
           type="text" 
           id="queryInput" 
-          placeholder="Type a command or speak (e.g. 'what is current charge percent', 'play believer on youtube')..." 
+          placeholder="Type or speak (e.g. 'what time is it', 'open whatsapp', 'what is my battery')..." 
           class="flex-1 bg-black/50 border border-cyan-500/30 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition"
           autocomplete="off"
         >
-        <button type="button" id="micBtn" onclick="toggleVoiceListening()" class="btn-neon px-4 py-2.5 text-xs text-cyan-300 border-cyan-400/50 hover:border-cyan-300 flex items-center gap-1.5" title="Click or Press Spacebar to Talk">
+        <button type="button" id="micBtn" onclick="toggleVoiceListening()" class="btn-neon px-4 py-2.5 text-xs text-cyan-300 border-cyan-400/50 hover:border-cyan-300 flex items-center gap-1.5" title="Click to Talk">
           <i id="micBtnIcon" class="fa-solid fa-microphone"></i>
           <span id="micBtnText">Talk</span>
         </button>
@@ -337,77 +186,60 @@
       </form>
     </div>
 
-    <!-- Tab 2: Workflows & Multi-Step Macros -->
-    <div id="tabContentWorkflows" class="hidden space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- Routine 1: Morning Briefing -->
-        <div class="bg-black/30 border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between">
-          <div>
-            <div class="flex items-center gap-2 text-cyan-400 font-bold mb-1.5">
-              <i class="fa-solid fa-sun"></i> Morning System Briefing
-            </div>
-            <p class="text-xs text-gray-400 mb-4">
-              Scans CPU/RAM, checks battery levels, verifies pending calendar reminders, and generates a daily briefing note.
-            </p>
-          </div>
-          <button onclick="runWorkflow('morning_briefing')" class="btn-neon text-xs py-2 justify-center w-full">
-            <i class="fa-solid fa-play"></i> Execute Routine
+    <!-- Tab 2: Visual Assistant for the Blind (Camera & Text Reader) -->
+    <div id="tabContentVision" class="hidden space-y-4">
+      <div class="bg-black/40 border border-cyan-500/30 p-4 rounded-xl space-y-4">
+        <div>
+          <h3 class="text-sm font-bold text-cyan-400 uppercase flex items-center gap-2">
+            <i class="fa-solid fa-eye text-cyan-400"></i> Artificial Eyes for the Blind
+          </h3>
+          <p class="text-xs text-gray-300 mt-1">
+            Point your phone camera at an object, document, medicine bottle, or room. JARVIS will analyze the scene or read the text aloud into your ears.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+          <label class="btn-neon flex-1 text-sm py-3 justify-center cursor-pointer flex items-center gap-2 text-cyan-300 font-bold border-cyan-400 hover:border-cyan-300">
+            <i class="fa-solid fa-camera text-lg"></i>
+            <span>Take Photo / Read Scene</span>
+            <input type="file" id="mobilePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="handleMobilePhotoUpload(event)">
+          </label>
+          <button onclick="speakCurrentVisionOutput()" type="button" class="btn-neon px-4 py-3 text-xs justify-center text-amber-300 border-amber-400/50">
+            <i class="fa-solid fa-volume-high mr-1"></i> Speak Again
+          </button>
+          <button onclick="copyOcrText()" type="button" class="btn-neon px-4 py-3 text-xs justify-center">
+            <i class="fa-solid fa-copy mr-1"></i> Copy OCR Text
           </button>
         </div>
 
-        <!-- Routine 2: Focus Mode -->
-        <div class="bg-black/30 border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between">
-          <div>
-            <div class="flex items-center gap-2 text-indigo-400 font-bold mb-1.5">
-              <i class="fa-solid fa-bullseye"></i> Focus Work Mode
-            </div>
-            <p class="text-xs text-gray-400 mb-4">
-              Lowers background speaker volume by 4 steps and logs a focus productivity session into memory.
-            </p>
-          </div>
-          <button onclick="runWorkflow('focus_mode')" class="btn-neon text-xs py-2 justify-center w-full">
-            <i class="fa-solid fa-play"></i> Execute Routine
-          </button>
+        <!-- Camera Snapshot Preview -->
+        <div id="screenshotContainer" class="w-full flex items-center justify-center min-h-[160px] bg-black/60 rounded-xl border border-cyan-500/20 p-2">
+          <span class="text-xs text-gray-400">No photo taken yet. Tap "Take Photo" or say "Jarvis, what do you see?"</span>
         </div>
 
-        <!-- Routine 3: System Diagnostics -->
-        <div class="bg-black/30 border border-cyan-500/30 p-4 rounded-xl flex flex-col justify-between">
-          <div>
-            <div class="flex items-center gap-2 text-emerald-400 font-bold mb-1.5">
-              <i class="fa-solid fa-shield-halved"></i> Quick System Audit
-            </div>
-            <p class="text-xs text-gray-400 mb-4">
-              Queries real-time hardware status, memory usage, and updates desktop context telemetry.
-            </p>
-          </div>
-          <button onclick="triggerAction('get_system_summary')" class="btn-neon text-xs py-2 justify-center w-full">
-            <i class="fa-solid fa-bolt"></i> Run Audit
-          </button>
+        <!-- Spoken Analysis Output -->
+        <div class="bg-black/60 border border-cyan-500/30 p-4 rounded-xl font-mono text-sm text-cyan-100" id="visionOutputText">
+          // Spoken description and read text will appear here...
         </div>
-      </div>
-
-      <!-- Execution Log Console -->
-      <div class="bg-black/50 border border-gray-800 rounded-xl p-3 font-mono text-xs text-gray-300 h-40 overflow-y-auto" id="workflowLog">
-        <span class="text-gray-500">// Workflow execution output will appear here...</span>
       </div>
     </div>
 
     <!-- Tab 3: Notes & Tasks -->
     <div id="tabContentNotes" class="hidden space-y-4">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- New Note / Task Form -->
+        <!-- New Note Form -->
         <div class="bg-black/30 border border-cyan-500/20 p-4 rounded-xl">
           <h3 class="text-sm font-bold text-cyan-400 uppercase mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-pen-to-square"></i> Create Note or Task
+            <i class="fa-solid fa-pen-to-square"></i> Voice & Text Notes
           </h3>
           <form onsubmit="handleCreateNote(event)" class="space-y-3">
-            <input type="text" id="noteTitleInput" placeholder="Title (e.g. Call Client, Grocery List)..." class="w-full bg-black/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-white" required>
-            <textarea id="noteContentInput" placeholder="Details or task description..." rows="3" class="w-full bg-black/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-white" required></textarea>
+            <input type="text" id="noteTitleInput" placeholder="Title (e.g. Doctor Appointment, Grocery)..." class="w-full bg-black/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-white" required>
+            <textarea id="noteContentInput" placeholder="Note content or checklist item..." rows="3" class="w-full bg-black/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-white" required></textarea>
             <div class="flex items-center justify-between gap-2">
-              <input type="text" id="noteTagsInput" placeholder="Tags (e.g. work, urgent)..." class="flex-1 bg-black/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-white">
+              <input type="text" id="noteTagsInput" placeholder="Tags (e.g. personal, urgent)..." class="flex-1 bg-black/50 border border-cyan-500/30 rounded-lg px-3 py-2 text-xs text-white">
               <label class="flex items-center gap-1.5 text-xs text-cyan-300 cursor-pointer shrink-0">
                 <input type="checkbox" id="noteIsTaskInput" class="accent-cyan-400">
-                <span>Todo Task</span>
+                <span>Task Checklist</span>
               </label>
             </div>
             <button type="submit" class="btn-neon text-xs py-2 w-full justify-center">
@@ -416,12 +248,12 @@
           </form>
         </div>
 
-        <!-- Stored Notes & Tasks List -->
+        <!-- Notes List & Spoken Output -->
         <div class="bg-black/30 border border-cyan-500/20 p-4 rounded-xl flex flex-col">
           <div class="flex justify-between items-center mb-3">
-            <h3 class="text-sm font-bold text-cyan-400 uppercase">Memory & Task List</h3>
-            <button onclick="loadNotes()" class="text-xs text-cyan-400 hover:underline">
-              <i class="fa-solid fa-rotate-right"></i> Refresh
+            <h3 class="text-sm font-bold text-cyan-400 uppercase">Saved Notes</h3>
+            <button onclick="readNotesAloud()" class="text-xs text-amber-300 hover:underline flex items-center gap-1 font-bold">
+              <i class="fa-solid fa-volume-high"></i> Read Aloud
             </button>
           </div>
           <div id="notesListContainer" class="flex-1 overflow-y-auto max-h-60 space-y-2 pr-1">
@@ -431,107 +263,6 @@
       </div>
     </div>
 
-    <!-- Tab: WhatsApp & Direct Communications -->
-    <div id="tabContentWhatsapp" class="hidden space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Direct WhatsApp Transmission Card -->
-        <div class="bg-black/30 border border-green-500/30 p-4 rounded-xl flex flex-col justify-between">
-          <div>
-            <h3 class="text-sm font-bold text-green-400 uppercase mb-3 flex items-center gap-2">
-              <i class="fa-brands fa-whatsapp text-green-400"></i> Direct WhatsApp Transmission
-            </h3>
-            <form onsubmit="handleSendWhatsApp(event)" class="space-y-3">
-              <div>
-                <label class="text-[10px] text-gray-400 uppercase block mb-1">Recipient Name or Phone</label>
-                <input type="text" id="waRecipientInput" placeholder="e.g. Mom, Alex, or +1234567890..." class="w-full bg-black/50 border border-green-500/30 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-green-400" required>
-              </div>
-              <div>
-                <label class="text-[10px] text-gray-400 uppercase block mb-1">Message Content</label>
-                <textarea id="waMessageInput" placeholder="Type your WhatsApp message..." rows="3" class="w-full bg-black/50 border border-green-500/30 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-green-400" required></textarea>
-              </div>
-              <div class="grid grid-cols-2 gap-2 pt-1">
-                <button type="submit" class="btn-neon text-xs py-2 justify-center border-green-500/40 hover:border-green-400 text-green-300">
-                  <i class="fa-solid fa-paper-plane mr-1"></i> Send Text
-                </button>
-                <button type="button" onclick="handleWhatsAppCall()" class="btn-neon text-xs py-2 justify-center border-emerald-500/40 hover:border-emerald-400 text-emerald-300">
-                  <i class="fa-solid fa-phone mr-1"></i> Start Call
-                </button>
-              </div>
-            </form>
-          </div>
-          <div id="waStatusFeedback" class="text-xs text-gray-400 mt-3 italic font-mono min-h-[1.2rem]">
-            // Select contact or enter phone number above
-          </div>
-        </div>
-
-        <!-- Contacts Directory & Quick Add -->
-        <div class="bg-black/30 border border-cyan-500/20 p-4 rounded-xl flex flex-col justify-between">
-          <div>
-            <div class="flex justify-between items-center mb-3">
-              <h3 class="text-sm font-bold text-cyan-400 uppercase flex items-center gap-2">
-                <i class="fa-solid fa-address-book"></i> Contacts Book
-              </h3>
-              <button onclick="loadContacts()" class="text-xs text-cyan-400 hover:underline">
-                <i class="fa-solid fa-rotate-right"></i> Refresh
-              </button>
-            </div>
-
-            <!-- Add Contact Form -->
-            <form onsubmit="handleCreateContact(event)" class="grid grid-cols-2 gap-2 mb-3 bg-black/40 p-2.5 rounded-lg border border-cyan-500/20">
-              <input type="text" id="contactNameInput" placeholder="Contact Name (e.g. Alex)" class="bg-black/50 border border-cyan-500/30 rounded px-2.5 py-1.5 text-xs text-white" required>
-              <input type="text" id="contactPhoneInput" placeholder="Phone (with country code)" class="bg-black/50 border border-cyan-500/30 rounded px-2.5 py-1.5 text-xs text-white" required>
-              <input type="email" id="contactEmailInput" placeholder="Email (optional)" class="bg-black/50 border border-cyan-500/30 rounded px-2.5 py-1.5 text-xs text-white">
-              <button type="submit" class="btn-neon text-xs py-1.5 justify-center">
-                <i class="fa-solid fa-user-plus mr-1"></i> Add Contact
-              </button>
-            </form>
-
-            <!-- Contacts List -->
-            <div id="contactsListContainer" class="overflow-y-auto max-h-52 space-y-2 pr-1">
-              <span class="text-xs text-gray-500">Loading contacts...</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tab 4: Vision & Screen Inspector -->
-    <div id="tabContentVision" class="hidden space-y-4">
-      <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <!-- Screenshot Preview -->
-        <div class="md:col-span-7 bg-black/40 border border-cyan-500/30 p-3 rounded-xl flex flex-col items-center justify-center min-h-[250px]">
-          <div id="screenshotContainer" class="w-full flex items-center justify-center">
-            <span class="text-xs text-gray-500">Click "Capture Screen" to view desktop snapshot</span>
-          </div>
-        </div>
-
-        <!-- Vision / OCR Controls & Analysis Output -->
-        <div class="md:col-span-5 flex flex-col justify-between space-y-3">
-          <div class="flex flex-wrap gap-2">
-            <button onclick="takeScreenshot()" class="btn-neon flex-1 text-xs py-2 justify-center">
-              <i class="fa-solid fa-camera"></i> Capture Screen
-            </button>
-            <label class="btn-neon flex-1 text-xs py-2 justify-center cursor-pointer flex items-center gap-1.5 text-cyan-300">
-              <i class="fa-solid fa-mobile-screen"></i> Phone Camera
-              <input type="file" id="mobilePhotoInput" accept="image/*" capture="environment" class="hidden" onchange="handleMobilePhotoUpload(event)">
-            </label>
-            <button onclick="analyzeScreenVision()" class="btn-neon flex-1 text-xs py-2 justify-center">
-              <i class="fa-solid fa-magnifying-glass-chart"></i> Analyze Vision
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between text-xs text-cyan-400 font-mono">
-            <span>VISION & OCR OUTPUT</span>
-            <button onclick="copyOcrText()" type="button" class="text-[11px] text-cyan-300 hover:text-white bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded transition">
-              <i class="fa-solid fa-copy mr-1"></i> Copy OCR
-            </button>
-          </div>
-          <div class="bg-black/50 border border-cyan-500/20 p-3 rounded-xl flex-1 font-mono text-xs overflow-y-auto max-h-64" id="visionOutputText">
-            <span class="text-gray-500">// Vision description and OCR text will appear here...</span>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- JavaScript Controller -->

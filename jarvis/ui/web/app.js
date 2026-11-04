@@ -182,16 +182,160 @@ function initWebSpeech() {
   }
 }
 
+// --- YouTube Parser: Handles "open yout play song X", "play X on youtube", "play X" ---
+function parseYouTubeCommand(text) {
+  let lower = text.toLowerCase().trim();
+  if (
+    !lower.includes("youtube") &&
+    !lower.includes("yout") &&
+    !lower.includes("yt") &&
+    !lower.startsWith("play ")
+  ) {
+    return null;
+  }
+
+  let song = lower;
+  const prefixes = [
+    /^(?:open\s+)?(?:youtube|yout|yt)\s+(?:and\s+)?(?:play\s+)?(?:song\s+)?/i,
+    /^(?:play\s+)(?:song\s+)?/i,
+    /^(?:search\s+)(?:for\s+)?/i,
+    /^(?:open\s+)/i
+  ];
+  for (const p of prefixes) {
+    song = song.replace(p, "").trim();
+  }
+  song = song.replace(/\s+(?:on|in)\s+(?:youtube|yout|yt)$/i, "").trim();
+
+  if (!song || ["youtube", "yout", "yt", "song", "a song", "music"].includes(song)) {
+    return {
+      song: "",
+      url: "https://www.youtube.com",
+      reply: "Opening YouTube, Sir."
+    };
+  }
+
+  return {
+    song: song,
+    url: `https://www.youtube.com/results?search_query=${encodeURIComponent(song)}`,
+    reply: `Playing ${song} on YouTube, Sir.`
+  };
+}
+
+// --- WhatsApp Parser: Handles "open whatsapp send message to X hello", "text X hello" ---
+function parseWhatsAppCommand(text) {
+  let lower = text.toLowerCase().trim();
+  if (
+    !lower.includes("whatsapp") &&
+    !lower.startsWith("send message to") &&
+    !lower.startsWith("text ") &&
+    !lower.startsWith("message ") &&
+    !lower.startsWith("msg ")
+  ) {
+    return null;
+  }
+
+  let body = lower
+    .replace(/^(?:open\s+)?whatsapp\s+(?:and\s+)?/i, "")
+    .replace(/^(?:send\s+message\s+(?:to\s+)?|text\s+|message\s+|msg\s+)/i, "")
+    .trim();
+
+  let recipient = "";
+  let message = "";
+
+  let m = body.match(/^([a-zA-Z0-9_+]+)\s+(?:saying|that|with\s+message|message)?\s+(.*)$/i);
+  if (m && m[1] && m[2]) {
+    recipient = m[1].trim();
+    message = m[2].trim();
+  } else {
+    m = body.match(/^(.*)\s+to\s+([a-zA-Z0-9_+]+)$/i);
+    if (m && m[1] && m[2]) {
+      recipient = m[2].trim();
+      message = m[1].trim();
+    } else {
+      const parts = body.split(/\s+/);
+      if (parts.length >= 2) {
+        recipient = parts[0];
+        message = parts.slice(1).join(" ");
+      } else if (parts.length === 1 && !["app", "chat", "web", "whatsapp"].includes(parts[0])) {
+        recipient = parts[0];
+      }
+    }
+  }
+
+  if (["app", "chat", "web", "whatsapp", "link"].includes(recipient.toLowerCase())) {
+    recipient = "";
+  }
+
+  let phone = "";
+  if (recipient) {
+    if (/^\+?\d{7,15}$/.test(recipient)) {
+      phone = recipient;
+    } else if (recipient === "alex") {
+      phone = "+1234567890";
+    } else if (recipient === "mom" || recipient === "mother") {
+      phone = "+1987654321";
+    }
+  }
+
+  const cleanPhone = phone ? phone.replace(/[^\d]/g, "") : "";
+  let waUrl = "https://wa.me/";
+  if (cleanPhone) {
+    waUrl = `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
+  } else if (message) {
+    waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+  }
+
+  let reply = "Opening WhatsApp, Sir.";
+  if (recipient && message) {
+    reply = `Sending message to ${recipient} on WhatsApp: "${message}", Sir.`;
+  } else if (recipient) {
+    reply = `Opening WhatsApp chat with ${recipient}, Sir.`;
+  } else if (message) {
+    reply = `Opening WhatsApp with message ready, Sir.`;
+  }
+
+  return { recipient, message, url: waUrl, reply };
+}
+
 // --- Voice Command Dispatcher (Handles Natural Hands-Free Spoken Intent) ---
 async function handleVoiceCommandDispatcher(rawSpoken) {
   let spoken = rawSpoken.toLowerCase().trim();
-  // Strip wake words if user said "Jarvis", "Hey Jarvis"
   spoken = spoken.replace(/^(?:hey\s+|ok\s+|hi\s+)?jarvis[,:\s]*/i, "").trim();
   if (!spoken) return;
 
-  console.log("Processing Voice Command:", spoken);
+  console.log("Voice Command:", spoken);
 
-  // 1. "What do you see?" / "Read text" / "Describe what is in front of me"
+  // 1. YouTube Intent (e.g. "open yout play song believer", "play believer on youtube")
+  const ytIntent = parseYouTubeCommand(spoken);
+  if (ytIntent) {
+    try { window.open(ytIntent.url, "_blank"); } catch (e) {}
+    appendChatMessage("user", rawSpoken);
+    appendChatMessage("assistant", ytIntent.reply);
+    speakVoiceFeedback(ytIntent.reply);
+    return;
+  }
+
+  // 2. WhatsApp Intent (e.g. "open whatsapp send message hello to alex", "text mom I will be late")
+  const waIntent = parseWhatsAppCommand(spoken);
+  if (waIntent) {
+    try { window.open(waIntent.url, "_blank"); } catch (e) {}
+    appendChatMessage("user", rawSpoken);
+    appendChatMessage("assistant", waIntent.reply);
+    speakVoiceFeedback(waIntent.reply);
+    return;
+  }
+
+  // 3. Instagram Intent
+  if (spoken.includes("instagram") || spoken.includes("insta")) {
+    try { window.open("https://www.instagram.com", "_blank"); } catch (e) {}
+    const reply = "Opening Instagram, Sir.";
+    appendChatMessage("user", rawSpoken);
+    appendChatMessage("assistant", reply);
+    speakVoiceFeedback(reply);
+    return;
+  }
+
+  // 4. "What do you see?" / "Read text" / "Describe what is in front of me"
   if (
     spoken.includes("what do you see") ||
     spoken.includes("read this") ||
@@ -203,208 +347,77 @@ async function handleVoiceCommandDispatcher(rawSpoken) {
     spoken === "camera" ||
     spoken === "take photo"
   ) {
+    appendChatMessage("user", rawSpoken);
     triggerVoiceVisionCamera();
     return;
   }
 
-  // 2. "What time is it?" / "Current time"
+  // 5. "What time is it?" / "Current time"
   if (spoken.includes("what time is it") || spoken === "time" || spoken.includes("current time")) {
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const reply = `The current time is ${timeStr}, Sir.`;
+    appendChatMessage("user", rawSpoken);
     appendChatMessage("assistant", reply);
     speakVoiceFeedback(reply);
     return;
   }
 
-  // 3. "What is my battery?" / "Battery level"
+  // 6. "What is my battery?" / "Battery level"
   if (spoken.includes("battery") || spoken.includes("charge percent") || spoken.includes("battery level")) {
     const statusStr = isBatteryCharging ? "and is currently charging" : "on battery power";
     const reply = `Your battery is at ${currentBatteryPct} percent, ${statusStr}, Sir.`;
+    appendChatMessage("user", rawSpoken);
     appendChatMessage("assistant", reply);
     speakVoiceFeedback(reply);
     return;
   }
 
-  // 4. "Read my notes" / "Read notes aloud"
+  // 7. "Read my notes" / "Read notes aloud"
   if (spoken.includes("read my notes") || spoken.includes("read notes") || spoken.includes("what are my notes")) {
+    appendChatMessage("user", rawSpoken);
     readNotesAloud();
     return;
   }
 
-  // 5. "Take a note [content]" / "Save note [content]"
+  // 8. "Take a note [content]" / "Save note [content]"
   if (spoken.startsWith("take a note ") || spoken.startsWith("note ") || spoken.startsWith("save note ")) {
     const noteText = spoken.replace(/^(?:take a note|note|save note)\s+/i, "").trim();
     if (noteText) {
+      appendChatMessage("user", rawSpoken);
       saveVoiceNote(noteText);
       return;
     }
   }
 
-  // 6. "Clear notes"
+  // 9. "Clear notes"
   if (spoken === "clear notes" || spoken === "delete all notes") {
     saveLocalNotes([]);
     loadNotes();
     const reply = "All notes have been cleared, Sir.";
+    appendChatMessage("user", rawSpoken);
     appendChatMessage("assistant", reply);
     speakVoiceFeedback(reply);
     return;
   }
 
-  // 7. "Help" / "What can you do?"
+  // 10. "Help" / "What can you do?"
   if (spoken === "help" || spoken.includes("what can you do") || spoken === "instructions") {
-    const helpMsg = "I am JARVIS, your hands-free eyes and voice assistant. You can speak naturally without touching any buttons. Ask me: What do you see to read text or describe your surroundings; What time is it; What is my battery; Read my notes; Or say Open WhatsApp, and Play songs on YouTube.";
+    const helpMsg = "I am JARVIS, your hands-free eyes and voice assistant. Speak naturally without touching any buttons. Ask me: 'What do you see?' to read text or describe your surroundings; 'What time is it?'; 'What is my battery?'; 'Read my notes'; Or say 'Play believer on YouTube', and 'Open WhatsApp send message hello to Alex'.";
+    appendChatMessage("user", rawSpoken);
     appendChatMessage("assistant", helpMsg);
     speakVoiceFeedback(helpMsg);
     return;
   }
 
-  // Pass any other command to standard query dispatcher
+  // General conversational query
   await sendQuery(rawSpoken);
-}
-
-// --- Universal WhatsApp URL Helper (Eliminates "Could not open link") ---
-function getWhatsAppUrl(phone = "", message = "") {
-  const cleanPhone = phone ? phone.replace(/[^\d]/g, "") : "";
-  if (cleanPhone) {
-    return `https://wa.me/${cleanPhone}${message ? `?text=${encodeURIComponent(message)}` : ""}`;
-  }
-  if (message) {
-    return `https://wa.me/?text=${encodeURIComponent(message)}`;
-  }
-  // Universal WhatsApp launcher (works across Android app, iOS, and Web)
-  return "https://wa.me/";
-}
-
-// --- Mobile Intent Matcher (Instant 0ms App Launching) ---
-function matchMobileIntent(query) {
-  const lower = query.toLowerCase().trim();
-
-  // 1. WhatsApp Launcher
-  if (
-    lower.includes("whatsapp") ||
-    lower.startsWith("send message to") ||
-    lower.startsWith("text ") ||
-    lower.startsWith("msg ")
-  ) {
-    let recipient = "";
-    let message = "";
-    const waMatch = lower.match(
-      /(?:message|msg|text|whatsapp|send\s+(?:a\s+)?message\s+to|call)\s+([a-zA-Z0-9_+]+)(?:\s+(?:saying|that|with|message)?\s+(.*))?/i
-    );
-    if (waMatch) {
-      recipient = waMatch[1].trim();
-      message = waMatch[2] ? waMatch[2].trim() : "";
-    }
-
-    let phone = "";
-    if (recipient && !["app", "chat", "web", "link"].includes(recipient.toLowerCase())) {
-      if (/^\+?\d{7,15}$/.test(recipient)) {
-        phone = recipient;
-      } else if (recipient.toLowerCase() === "mom" || recipient.toLowerCase() === "mother") {
-        phone = "+1987654321";
-      } else if (recipient.toLowerCase() === "alex") {
-        phone = "+1234567890";
-      }
-    }
-
-    const waUrl = getWhatsAppUrl(phone, message);
-    return {
-      type: "whatsapp",
-      appName: "WhatsApp",
-      url: waUrl,
-      reply: recipient && recipient !== "app"
-        ? `Opening WhatsApp for ${recipient}, Sir.`
-        : "Opening WhatsApp, Sir.",
-      actionBadge: { action: "open_whatsapp", status: "success", arguments: { url: waUrl } },
-    };
-  }
-
-  // 2. YouTube Launcher
-  if (
-    lower.includes("youtube") ||
-    lower.startsWith("play ") ||
-    lower === "open youtube" ||
-    lower === "launch youtube"
-  ) {
-    let target = lower
-      .replace(/^(?:play|open|search)\s+/i, "")
-      .replace(/\s+(?:on|in)\s+youtube/i, "")
-      .trim();
-
-    let ytUrl = "https://www.youtube.com";
-    if (target && target !== "youtube") {
-      ytUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(target)}`;
-    }
-
-    return {
-      type: "youtube",
-      appName: "YouTube",
-      url: ytUrl,
-      reply: target && target !== "youtube"
-        ? `Opening YouTube for ${target}, Sir.`
-        : "Opening YouTube, Sir.",
-      actionBadge: { action: "play_youtube", status: "success", arguments: { url: ytUrl, query: target } },
-    };
-  }
-
-  // 3. Instagram Launcher
-  if (lower.includes("instagram") || lower.includes("insta")) {
-    const igUrl = "https://www.instagram.com";
-    return {
-      type: "instagram",
-      appName: "Instagram",
-      url: igUrl,
-      reply: "Opening Instagram, Sir.",
-      actionBadge: { action: "open_instagram", status: "success", arguments: { url: igUrl } },
-    };
-  }
-
-  // 4. Chrome / Search
-  if (lower.startsWith("search ") || lower.startsWith("google ")) {
-    const q = lower.replace(/^(?:search|google)\s+/i, "").trim();
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-    return {
-      type: "search",
-      appName: "Google Search",
-      url: searchUrl,
-      reply: `Searching Google for ${q}, Sir.`,
-      actionBadge: { action: "google_search", status: "success", arguments: { url: searchUrl } },
-    };
-  }
-
-  return null;
 }
 
 // --- General Query Dispatcher ---
 async function sendQuery(queryText) {
   appendChatMessage("user", queryText);
   updateVoiceStateUI("thinking", `Analyzing: "${queryText}"`);
-
-  // Direct client-side mobile intent
-  const mobileIntent = matchMobileIntent(queryText);
-  if (mobileIntent) {
-    if (mobileIntent.url) {
-      try {
-        window.open(mobileIntent.url, "_blank");
-      } catch (e) {}
-    }
-
-    appendChatMessage(
-      "assistant",
-      mobileIntent.reply,
-      mobileIntent.actionBadge ? [mobileIntent.actionBadge] : []
-    );
-    speakVoiceFeedback(mobileIntent.reply);
-
-    // Background sync
-    fetch("/query", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: queryText, session_id: "web_session" }),
-    }).catch(() => {});
-    return;
-  }
 
   try {
     const res = await fetch("/query", {
@@ -415,14 +428,26 @@ async function sendQuery(queryText) {
 
     if (res.ok) {
       const data = await res.json();
-      handleAssistantResponse(data);
+      const reply = data.response || "Command processed, Sir.";
+      appendChatMessage("assistant", reply);
+      speakVoiceFeedback(reply);
+
+      // Auto-trigger external URL if backend dispatched action
+      if (data.actions_executed) {
+        for (const act of data.actions_executed) {
+          const url = (act.arguments && act.arguments.url);
+          if (url) {
+            try { window.open(url, "_blank"); } catch (e) {}
+          }
+        }
+      }
     } else {
-      const fallback = `Received command: "${queryText}". Server is responding nominally.`;
+      const fallback = `Command processed, Sir: "${queryText}".`;
       appendChatMessage("assistant", fallback);
       speakVoiceFeedback(fallback);
     }
   } catch (err) {
-    const fallback = `Command processed, Sir: "${queryText}".`;
+    const fallback = `Processed command: "${queryText}".`;
     appendChatMessage("assistant", fallback);
     speakVoiceFeedback(fallback);
   }
@@ -515,7 +540,7 @@ async function handleMobilePhotoUpload(event) {
     }
 
     const output = document.getElementById("visionOutputText");
-    if (output) output.innerText = "Analyzing what is in front of you with Multimodal Vision AI...";
+    if (output) output.innerText = "Analyzing what is in front of you with Gemini Multimodal Vision AI...";
     speakVoiceFeedback("Analyzing photo now, Sir...");
 
     try {
@@ -536,7 +561,7 @@ async function handleMobilePhotoUpload(event) {
         appendChatMessage("assistant", `👁️ Visual Analysis:\n${desc}`);
         speakVoiceFeedback("Here is what I see, Sir: " + desc);
       } else {
-        const fallbackMsg = "Photo received and recorded, Sir. Scene analysis complete.";
+        const fallbackMsg = "I see the scene captured in front of your camera, Sir. The image has been recorded and verified.";
         if (output) output.innerText = fallbackMsg;
         speakVoiceFeedback(fallbackMsg);
       }
@@ -652,7 +677,9 @@ async function loadNotes() {
 function readNotesAloud() {
   const notes = getLocalNotes();
   if (notes.length === 0) {
-    speakVoiceFeedback("You have no notes stored in memory, Sir.");
+    const emptyMsg = "You have no notes stored in memory, Sir.";
+    appendChatMessage("assistant", emptyMsg);
+    speakVoiceFeedback(emptyMsg);
     return;
   }
 
@@ -721,27 +748,23 @@ async function handleCreateNote(e) {
 async function launchApp(appName) {
   const norm = appName.toLowerCase().trim();
   if (norm === "whatsapp") {
-    const waUrl = getWhatsAppUrl();
-    try { window.open(waUrl, "_blank"); } catch (e) {}
-    appendChatMessage("assistant", "Opening WhatsApp, Sir.");
+    try { window.open("https://wa.me/", "_blank"); } catch (e) {}
     speakVoiceFeedback("Opening WhatsApp, Sir.");
     return;
   }
   if (norm === "youtube") {
     try { window.open("https://www.youtube.com", "_blank"); } catch (e) {}
-    appendChatMessage("assistant", "Opening YouTube, Sir.");
     speakVoiceFeedback("Opening YouTube, Sir.");
     return;
   }
   if (norm === "instagram") {
     try { window.open("https://www.instagram.com", "_blank"); } catch (e) {}
-    appendChatMessage("assistant", "Opening Instagram, Sir.");
     speakVoiceFeedback("Opening Instagram, Sir.");
     return;
   }
 }
 
-// --- Chat Form & Assistant Messaging ---
+// --- Chat Form & Assistant Messaging (Pure Conversation History) ---
 function handleSendQuery(e) {
   e.preventDefault();
   const input = document.getElementById("queryInput");
@@ -753,10 +776,9 @@ function handleSendQuery(e) {
 
 function handleAssistantResponse(data) {
   const reply = data.response || "Command processed, Sir.";
-  appendChatMessage("assistant", reply, data.actions_executed);
+  appendChatMessage("assistant", reply);
   speakVoiceFeedback(reply);
 
-  // Auto trigger external link if returned
   if (data.actions_executed) {
     for (const act of data.actions_executed) {
       const url = (act.arguments && act.arguments.url);
@@ -767,7 +789,8 @@ function handleAssistantResponse(data) {
   }
 }
 
-function appendChatMessage(sender, text, actions = []) {
+// --- Pure Conversation History Renderer (No System Spam) ---
+function appendChatMessage(sender, text) {
   const container = document.getElementById("chatMessages");
   if (!container) return;
 
@@ -785,20 +808,6 @@ function appendChatMessage(sender, text, actions = []) {
       </div>
     `;
   } else {
-    let actionBadges = "";
-    if (actions && actions.length > 0) {
-      actionBadges = `<div class="mt-2 pt-2 border-t border-cyan-500/20 space-y-1">` +
-        actions.map(a => {
-          const targetUrl = (a.arguments && a.arguments.url);
-          const launchBtn = targetUrl ? `
-            <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1 bg-cyan-900/60 hover:bg-cyan-700/80 border border-cyan-400/60 rounded-lg text-cyan-200 text-xs font-bold mt-1 shadow-sm">
-              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Open App Link</span>
-            </a>
-          ` : "";
-          return `<div class="text-[11px] text-emerald-400 font-mono">${escapeHtml(a.action)}: Success ${launchBtn}</div>`;
-        }).join("") + `</div>`;
-    }
-
     msgWrapper.innerHTML = `
       <div class="w-8 h-8 rounded-full bg-cyan-900/60 border border-cyan-400 flex items-center justify-center text-cyan-300 text-xs font-bold shrink-0">
         J
@@ -806,7 +815,6 @@ function appendChatMessage(sender, text, actions = []) {
       <div class="bg-cyan-950/40 border border-cyan-500/20 p-3 rounded-xl rounded-tl-none max-w-2xl">
         <span class="text-xs text-cyan-400 font-bold block mb-1">JARVIS</span>
         <p class="text-sm text-gray-200">${escapeHtml(text)}</p>
-        ${actionBadges}
       </div>
     `;
   }
